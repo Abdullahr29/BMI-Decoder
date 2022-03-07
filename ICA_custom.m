@@ -55,15 +55,17 @@ end
 %% ICA
 % Number of ICs is the rows of the input
 N = 98;
-transform = zeros(600, 98, N);
-iterations = 200;
+transform = zeros(98, 975, N);
+iterations = 20;
 tolerance = 1e-4;
 
-for i =1:600
-    transform(i, :, :) = ica(squeeze(train(:, i, :)), iterations, tolerance);
+for i = 1:98
+    [~, transform(i, :, :)] = ica(squeeze(train(i, :, :)), iterations, tolerance);
 end
+% Doesn't work because output of ica is 975*600 (was sources_est, now
+% changed to W)
 
-cluster(N, transform, train, test);
+%cluster(N, transform, train, test);
 
 
 
@@ -73,6 +75,11 @@ function cluster(N, transform, train, test)
     % Transform data using ica/pca principal components
     transformed_train = zeros(98,600,N);
     transformed_test  = zeros(98,200,N);
+    
+    for i = 1:98
+       transformed_train(i,:,:) = squeeze(train(i,:,:)) * squeeze(transform(i,:,:));
+       transformed_test(i,:,:)  = squeeze(test(i,:,:))  * squeeze(transform(i,:,:));
+    end
 end
 
 % Hyperbolic tangent
@@ -112,21 +119,31 @@ end
 
 % Update the demixing matrix
 function w_new = update_demixing_mat(w, X)
+    % Function solving the following equation (written in pseudocode)
+    %w_new = mean((X * g(w' * X))) - mean(g_der(w'*X) * w);
+    
+    % First term
     a = g(w * X);
-    b = [(X(1,:).* a); (X(2,:).*a); (X(3,:).* a)];
+    %b = [(X(1,:).* a); (X(2,:).*a); (X(3,:).* a)];
+    [components_num, len] = size(X); % rows of X = number of independent components  
+    b = zeros(components_num, len);
+    for i = 1:components_num
+        b(i, :) = X(i,:).* a; 
+    end
     c = mean(b, 2);
+    
+    % Second term
     a2 = g_der(w * X); 
     b2 = mean(a2);
     c2 = b2 .* w;
-    w_new = c' - c2; %works until here
-    %w_new = mean((X * g(w' * X))) - mean(g_der(w'*X) * w);
-    %squaroot = sqrt(sum(w_new.^2));
+    
+    w_new = c' - c2; 
     w_new = w_new/sqrt(sum(w_new .^2));
 end
 
 % ICA 
 %   Note: would be better trying to implement with mutual information
-function sources_est = ica(X, iterations, tolerance)
+function [sources_est, W] = ica(X, iterations, tolerance)
     % Center
     X = center(X);
     
@@ -138,8 +155,8 @@ function sources_est = ica(X, iterations, tolerance)
     W = zeros(components_num);
     
     for i = 1:components_num
-       %w = rand(1, components_num);
-       w = [0.2, 0.5, 0.3];
+       w = rand(1, components_num);
+       %w = [0.2, 0.5, 0.3];
        for j = 1:iterations
           w_new = update_demixing_mat(w, X);
           
