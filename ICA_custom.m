@@ -1,23 +1,31 @@
 % Script with our ICA function and testing it
 % code adapted from https://towardsdatascience.com/independent-component-analysis-ica-in-python-a0ef0db0955e
+
+%% ICA testing: Test Signals
+tolerance = 1e-5; % If the new weights vector differs from the old one by less than 'tolerance', we terminate the iteration 
+
+% Generating test signals
+n_samples = 2000; % Length of independent sources
+time = linspace(0, 8, n_samples); 
+s1 = sin(2*time);
+s2 = sign(sin(3*time));
+s3 = sawtooth(2*pi*time);
+
+% Building mixed signals matrix
+X = [s1', s2', s3']; % each column contains one recording 
+% (3 columns = want to identify 3 sources)
+% hence for our example we want 98 columns?
+%X = [s1; s2; s3];
+A = [1,1,1; 0.5,2,1; 1.5,1,2];
+X = X*A';
+
+%% ICA testing: Algorithm 
+iterations = 1000;
+S = ica(X, iterations, tolerance);
+plot_mixture_sources_predictions(X, [s1; s2; s3], S)
+
+%% 
 load('monkeydata_training.mat');
-
-%% Separating data into training and testing (LIV)
-train = trial(1:80, :);
-test = trial(81:end, :);
-
-% Arranging into array of padded spike trains
-train_spikes = zeros(100, 8, 98, 975);
-% each trial, each angle, each neuron, time series
-
-for ang = 1:8
-    for tri = 1:80
-        for neur = 1:98
-            n = length(train(tri, ang).spikes(neur,:));
-            train_spikes(tri, ang, neur, 1:n) = train(tri, ang).spikes(neur,:);
-        end
-    end
-end
 
 %% ICA: Create input data
 % Perform separate ICA on each neuron
@@ -56,35 +64,16 @@ for i =1:600
 end
 
 cluster(N, transform, train, test);
-%% ICA testing: Test Signals
-tolerance = 1e-5; % If the new weights vector differs from the old one by less than 'tolerance', we terminate the iteration 
-
-% Generating test signals
-n_samples = 2000; % Length of independent sources
-time = linspace(0, 8, n_samples); 
-s1 = sin(2*time);
-s2 = sign(sin(3*time));
-s3 = sawtooth(2*pi*time);
-
-% Building mixed signals matrix
-X = [s1', s2', s3']; % each column contains one recording 
-% (3 columns = want to identify 3 sources)
-% hence for our example we want 98 columns?
-%X = [s1; s2; s3];
-A = [1,1,1; 0.5,2,1; 1.5,1,2];
-X = X*A';
-%% ICA testing
-iterations = 1000;
-S = ica(X, iterations, tolerance);
-plot_mixture_sources_predictions(X, [s1; s2; s3], S)
 
 
 
-% ICA custom functions
-% x contains p variables (98)
-%X = train_spikes(tri,ang,:,:);
-% mdl = rica(X, 8, 'IterationLimit', 500);
-%[V, D] = eig(A);
+%% Functions
+% Clustering algorithm
+function cluster(N, transform, train, test)
+    % Transform data using ica/pca principal components
+    transformed_train = zeros(98,600,N);
+    transformed_test  = zeros(98,200,N);
+end
 
 % Hyperbolic tangent
 function hyper_tan = g(x)
@@ -201,8 +190,3 @@ function plot_mixture_sources_predictions(X, original_sources, sources_est)
     title('predicted sources')
 end
 
-function cluster(N, transform, train, test)
-    % Transform data using ica/pca principal components
-    transformed_train = zeros(98,600,N);
-    transformed_test  = zeros(98,200,N);
-end
