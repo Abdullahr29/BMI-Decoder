@@ -1,5 +1,5 @@
 function [eigenvalues, principal_components] = our_pca(data, variance_explained)
-    [U,S,V] = svd(data);
+    [U,S,V] = svd(data, "econ");
     eigenvalues = diag(S);
     principal_components = U;
     total = 0;
