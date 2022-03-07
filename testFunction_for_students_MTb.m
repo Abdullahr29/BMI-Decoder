@@ -6,7 +6,7 @@
 
 function RMSE = testFunction_for_students_MTb(teamName)
 
-load monkeydata0.mat
+load monkeydata_training.mat % changed it from monkeydata0.mat so we can test the function
 
 % Set random number generator
 rng(2013);
@@ -15,8 +15,8 @@ ix = randperm(length(trial));
 %addpath(teamName);
 
 % Select training and testing data (you can choose to split your data in a different way if you wish)
-trainingData = trial(ix(1:50),:);
-testData = trial(ix(51:end),:);
+trainingData = trial(ix(1:75),:);
+testData = trial(ix(76:end),:);
 
 fprintf('Testing the continuous position estimator...')
 
