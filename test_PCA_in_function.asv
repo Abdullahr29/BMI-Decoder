@@ -28,16 +28,14 @@ function pca_PCs = positionEstimatorTraining(trainingData)
     N = 50; % Number of PCs
     pca_PCs = zeros(98,len*8,N);
     pca_eig = zeros(98,N);
-    transformed = zeros(98,len*8,N);
-
     for i=1:98
         [eig,PCs] = our_pca(squeeze(data(i,:,:)),0);
         pca_PCs(i,:,:) = PCs(:,1:N);
         pca_eig(i,:,:) = eig(1:N);
     end  
+
     
-    
-    
+    % USE PCA RESULTS TO TRANSFORM DATA!
     % CREATE AVG SIGNAL FOR EACH OF THE 8 DIRECTIONS! 
 
 end

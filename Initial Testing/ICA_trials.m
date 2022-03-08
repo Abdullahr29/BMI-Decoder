@@ -85,7 +85,7 @@ function transform = my_pca(N,train)
     % Perform PCA. Obtain transformations
     transform = zeros(98,500,N);
     for i=1:98
-        transform(i,:,:) = pca(squeeze(train(1,:,:)),'NumComponents',N);
+        transform(i,:,:) = pca(squeeze(train(i,:,:)),'NumComponents',N);
     end  
 end
 
