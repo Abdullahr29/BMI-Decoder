@@ -1,4 +1,5 @@
-function [eigenvalues, principal_components] = our_pca(data, variance_explained)
+ 
+function [eigenvalues, principal_components] = our_pca(data, variance_explained, dims)
     [U,S,~] = svd(data, "econ");
     eigenvalues = diag(S);
     principal_components = U;
@@ -13,4 +14,6 @@ function [eigenvalues, principal_components] = our_pca(data, variance_explained)
             eigenvalues(i) =eigenvalues(i-1)+ eigenvalues(i);
         end
     end
+    principal_components = principal_components(:,1:dims);
 end
+
