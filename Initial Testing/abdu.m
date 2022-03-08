@@ -40,13 +40,15 @@ scatter(t, hand_x)
 scatter(t, hand_y)
 hold off
 
-hand_x = trial(12,7).handPos(1,:);
-hand_y = trial(12,7).handPos(2,:);
+hand_x = trial(78,2).handPos(1,:);
+hand_y = trial(78,2).handPos(2,:);
 
 t = 1:length(hand_x);
 
 figure(7)
-scatter(hand_x, hand_y)
+%scatter(hand_x, hand_y)
+plot3(t,hand_x,hand_y)
+xlabel('time')
 
 figure(8)
 hold on

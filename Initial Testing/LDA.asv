@@ -176,7 +176,7 @@ end
 %using pcs for both training and test set
 class = classify(testing_pcs,training_pcs,pcs_class);
 cf = confusionchart(pcs_test_class,class);
-%still dogshit, me stumped, will do some more research
+%still dogshit, me stumped, will do some more r
 
 
 %% OUR LDA: Mean and standardisation
