@@ -25,11 +25,9 @@ average_pcs = positionEstimatorTraining(trainingData);
 % 1.
 % Use some data to create a model
 % We have to return the characteristic model parameters
- 
-% modelParameters = positionEstimatorTraining(trainingData)
- 
+  
 function average_pcs = positionEstimatorTraining(trainingData)
-    % trainingData is of the form 50x8 struct (each item has trialId,
+    % trainingData is of the form 80x8 struct (each item has trialId,
     % spikes and handPos fields)
     % We will transform spikes data to suit our needs :)
     pcs = cell(80, 8);
