@@ -3,14 +3,15 @@
 design_mat = calculate_design_matrix(trial, 80);
 
 % standarise the design_matrix
-
+m = mean(design_mat,1);
+s = std(design_mat,1);
 design_mat_standarised = (design_mat - m)./s;
 
 % just in case
 design_mat_standarised(isnan(design_mat_standarised)) = 0;
 design_mat_standarised(isinf(design_mat_standarised)) = 0;
 
-[ eigenvalues, principal_components] = our_pca(design_mat_standarised, 1,36);
+[ eigenvalues, principal_components] = our_pca(design_mat_standarised, 1,100);
 design_mat_standarised = design_mat_standarised*principal_components;
 Y=repmat([1:1:8]',80,1);
 model = fitcdiscr(design_mat_standarised,Y);
@@ -96,14 +97,3 @@ function design_mat_test = calculate_test_design_matrix(spike_data, training_siz
     end
     design_mat_test =[fr_avg,fr_avg_pa,fr_avg_ma,fr_avg_c];
 end
-function [P,I] = PCA(x,p)
-            %PCA Calculates the principal components 
-            % x - preprocessed firing rate in bins
-            % p - number of components
-            % P - principal components matrix
-            
-            C = cov(x);
-            [V,D] = eig(C);
-            [~,I] = maxk(abs(diag(D)),p);
-            P = V(:,I);
-        end
