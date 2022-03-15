@@ -5,12 +5,14 @@ function [eigenvalues, principal_components] = our_pca(data, variance_explained,
     principal_components = U;
     total = 0;
     
+    [~, features] = size(data);
+    
     if(variance_explained == 1)
-        for i=1:size(data)
+        for i=1:features
             total = total + eigenvalues(i);
         end
         eigenvalues = (eigenvalues)./total;
-        for i=2:size(data)
+        for i=2:features
             eigenvalues(i) =eigenvalues(i-1)+ eigenvalues(i);
         end
     end
