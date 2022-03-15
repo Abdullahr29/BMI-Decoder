@@ -1,0 +1,201 @@
+%% Calculate Firing Rates
+
+design_mat = calculate_design_matrix(trial, 80);
+
+% standarise the design_matrix
+
+design_mat_standarised = (design_mat - m)./s;
+
+% just in case
+design_mat_standarised(isnan(design_mat_standarised)) = 0;
+design_mat_standarised(isinf(design_mat_standarised)) = 0;
+
+[ eigenvalues, principal_components] = our_pca(design_mat_standarised, 1,20);
+design_mat_standarised = design_mat_standarised*principal_components;
+Y=repmat([1:1:8]',80,1);
+model = fitcdiscr(design_mat_standarised,Y);
+
+% prep test data
+
+design_mat_test = calculate_test_design_matrix(trial, 20);
+% m = mean(design_mat_test,1);
+% s = std(design_mat_test,1);
+design1 = (design_mat_test - m)./s;
+design1(isnan(design1)) = 0;
+design1(isinf(design1)) = 0;
+[ eigenvalues, principal_components1] = our_pca(design1, 0,20);
+design2 = design1*principal_components1;
+Y2=repmat([1:1:8]',20,1);
+% class = classify(design_mat_standarised_test,design_mat_standarised,Y);
+% figure
+% cf = confusionchart(Y2,class);
+class = predict(model,design2); 
+figure
+cf = confusionchart(class,Y2);
+
+%% Averaging Firing Rates
+
+design_mat = calculate_design_matrix(trial, 100);
+
+design_test_mat = calculate_design_matrix(trial, 100);
+
+sum_frs = cell(1,8);
+average_frs = cell(1,8);
+
+average_test_frs = cell(1,8);
+
+for i = 1:8
+    sum_frs{1,i} = zeros(98,4);
+    for j = 1:80
+        sum_frs{1,i} = sum_frs{1,i} + design_mat{j,i};
+    end
+    average_frs{1,i} = sum_frs{1,i}/80;
+    
+    sum_frs{1,i} = zeros(98,4);
+    for j = 81:100
+        sum_frs{1,i} = sum_frs{1,i} + design_test_mat{j,i};
+    end
+    average_test_frs{1,i} = sum_frs{1,i}/20;
+end
+
+train_data = zeros(784,4);
+test_data = zeros(784,4);
+class_set = zeros(784,1);
+temp = 1;
+for i = 1:8
+    train_data(temp:temp+98-1,:) = average_frs{1,i}(:,:);
+    test_data(temp:temp+98-1,:) = average_test_frs{1,i}(:,:);
+    class_set(temp:temp+98-1,1) = i;
+    
+    temp = temp+98;
+end
+% figure 
+% class = classify(test_data,train_data,class_set);
+% cf = confusionchart(class_set,class);
+
+
+
+design_pca = cell(100,8);
+
+for i = 1:100
+    for j = 1:8
+        temp = design_mat{i,j};
+        [explained, coeff] = our_pca(temp,1,4);
+        design_pca{i,j} = coeff;
+    end
+end
+
+sum_pcs = cell(1,8);
+average_pcs = cell(1,8);
+
+for i = 1:8
+    sum_pcs{1,i} = zeros(4,4);
+    for j = 1:80
+        sum_pcs{1,i} = sum_pcs{1,i} + design_pca{j,i};
+    end
+    average_pcs{1,i} = sum_pcs{1,i}/80;
+end
+
+average_pcs_test = cell(1,8);
+for i = 1:8
+    sum_pcs{1,i} = zeros(4,4);
+    for j = 81:100
+        sum_pcs{1,i} = sum_pcs{1,i} + design_pca{j,i};
+    end
+    average_pcs_test{1,i} = sum_pcs{1,i}/20;
+end
+
+train_data = zeros(32,4);
+test_data = zeros(32,4);
+class_set = zeros(32,1);
+temp = 1;
+for i = 1:8
+    train_data(temp:temp+4-1,:) = average_pcs{1,i}(:,:);
+    test_data(temp:temp+4-1,:) = average_pcs_test{1,i}(:,:);
+    class_set(temp:temp+4-1,1) = i;
+    
+    temp = temp+4;
+end
+
+figure 
+class = classify(test_data,train_data,class_set);
+cf = confusionchart(class_set,class);
+
+
+
+
+
+
+%% Functions
+function avg_fr = average_fr(spike_data)
+    %spike_data: any matrix of neurons x spikes(over time)
+    [neurons, len_data] = size(spike_data);
+    avg_fr = zeros(neurons,1);
+    avg_fr(:,1) = sum(spike_data,2);
+    avg_fr = avg_fr./len_data;
+    %avg_fr = transpose(avg_fr);
+end
+
+
+
+function design_mat = calculate_design_matrix(spike_data, training_size)
+    %spike_data: full set of unprocessed spike data
+    %training_size: rows out of 100 to use for training and design matrix
+    %window_sizes: 1x2 array indicating the size of the prep and after
+    %movement windows
+    
+    
+    fr_avg = zeros(training_size*8,98);
+    fr_avg_pa = zeros(training_size*8,98);
+    fr_avg_ma = zeros(training_size*8,98);
+    fr_avg_c = zeros(training_size*8,98);
+    temp = 0;
+    for i = 1:training_size
+        for j = 1:8
+            temp = temp + 1;
+            fr_avg(temp,:) = average_fr(spike_data(i,j).spikes(:,:));
+            fr_avg_pa(temp,:) = average_fr(spike_data(i,j).spikes(:,1:300));
+            fr_avg_ma(temp,:) = average_fr(spike_data(i,j).spikes(:,301:end-100));
+            fr_avg_c(temp,:) = average_fr(spike_data(i,j).spikes(:,end-99:end));
+               
+        end
+    end
+    design_mat =[fr_avg,fr_avg_pa,fr_avg_ma,fr_avg_c];
+end
+
+
+function design_mat_test = calculate_test_design_matrix(spike_data, training_size)
+    %spike_data: full set of unprocessed spike data
+    %training_size: rows out of 100 to use for training and design matrix
+    %window_sizes: 1x2 array indicating the size of the prep and after
+    %movement windows
+    
+    
+    fr_avg = zeros(training_size*8,98);
+    fr_avg_pa = zeros(training_size*8,98);
+    fr_avg_ma = zeros(training_size*8,98);
+    fr_avg_c = zeros(training_size*8,98);
+    temp = 0;
+    for i = 81: 80+training_size
+        for j = 1:8
+            temp = temp + 1;
+            fr_avg(temp,:) = average_fr(spike_data(i,j).spikes(:,:));
+            fr_avg_pa(temp,:) = average_fr(spike_data(i,j).spikes(:,1:300));
+            fr_avg_ma(temp,:) = average_fr(spike_data(i,j).spikes(:,301:end-100));
+            fr_avg_c(temp,:) = average_fr(spike_data(i,j).spikes(:,end-99:end));
+               
+        end
+    end
+    design_mat_test =[fr_avg,fr_avg_pa,fr_avg_ma,fr_avg_c];
+end
+function [P,I] = PCA(x,p)
+            %PCA Calculates the principal components 
+            % x - preprocessed firing rate in bins
+            % p - number of components
+            % P - principal components matrix
+            
+            C = cov(x);
+            [V,D] = eig(C);
+            [~,I] = maxk(abs(diag(D)),p);
+            P = V(:,I);
+        end
