@@ -179,6 +179,123 @@ cf = confusionchart(pcs_test_class,class);
 %still dogshit, me stumped, will do some more research
 
 
+%% Preprocess
+
+moving = cell(100,8);
+preparatory = cell(100,8);
+after_moving= cell(100,8);
+for i = 1:8
+    for j = 1:100
+        bingbong = zeros(98,575);
+        bingbong(:,1:(length(trial(j,i).spikes(1,:))-399)) = trial(j,i).spikes(:,300:end-100);
+        moving{j,i} = bingbong;
+    end
+end
+for i = 1:8
+    for j = 1:100
+        bingbong = zeros(98,300);
+        bingbong(:,1:300) = trial(j,i).spikes(:,1:300);
+        preparatory{j,i} = bingbong;
+    end
+end
+for i = 1:8
+    for j = 1:100
+        bingbong = zeros(98,100);
+        bingbong(:,1:100) = trial(j,i).spikes(:,end-99:end);
+        after_moving{j,i} = bingbong;
+    end
+end
+
+%% Averaging Firing Rates
+
+design_mat = calculate_design_matrix(trial, 100);
+
+design_test_mat = calculate_design_matrix(trial, 100);
+
+sum_frs = cell(1,8);
+average_frs = cell(1,8);
+
+average_test_frs = cell(1,8);
+
+for i = 1:8
+    sum_frs{1,i} = zeros(98,4);
+    for j = 1:80
+        sum_frs{1,i} = sum_frs{1,i} + design_mat{j,i};
+    end
+    average_frs{1,i} = sum_frs{1,i}/80;
+    
+    sum_frs{1,i} = zeros(98,4);
+    for j = 81:100
+        sum_frs{1,i} = sum_frs{1,i} + design_test_mat{j,i};
+    end
+    average_test_frs{1,i} = sum_frs{1,i}/20;
+end
+
+train_data = zeros(784,4);
+test_data = zeros(784,4);
+class_set = zeros(784,1);
+temp = 1;
+for i = 1:8
+    train_data(temp:temp+98-1,:) = average_frs{1,i}(:,:);
+    test_data(temp:temp+98-1,:) = average_test_frs{1,i}(:,:);
+    class_set(temp:temp+98-1,1) = i;
+    
+    temp = temp+98;
+end
+% figure 
+% class = classify(test_data,train_data,class_set);
+% cf = confusionchart(class_set,class);
+
+
+
+design_pca = cell(100,8);
+
+for i = 1:100
+    for j = 1:8
+        temp = design_mat{i,j};
+        [explained, coeff] = our_pca(temp,1,4);
+        design_pca{i,j} = coeff;
+    end
+end
+
+sum_pcs = cell(1,8);
+average_pcs = cell(1,8);
+
+for i = 1:8
+    sum_pcs{1,i} = zeros(4,4);
+    for j = 1:80
+        sum_pcs{1,i} = sum_pcs{1,i} + design_pca{j,i};
+    end
+    average_pcs{1,i} = sum_pcs{1,i}/80;
+end
+
+average_pcs_test = cell(1,8);
+for i = 1:8
+    sum_pcs{1,i} = zeros(4,4);
+    for j = 81:100
+        sum_pcs{1,i} = sum_pcs{1,i} + design_pca{j,i};
+    end
+    average_pcs_test{1,i} = sum_pcs{1,i}/20;
+end
+
+train_data = zeros(32,4);
+test_data = zeros(32,4);
+class_set = zeros(32,1);
+temp = 1;
+for i = 1:8
+    train_data(temp:temp+4-1,:) = average_pcs{1,i}(:,:);
+    test_data(temp:temp+4-1,:) = average_pcs_test{1,i}(:,:);
+    class_set(temp:temp+4-1,1) = i;
+    
+    temp = temp+4;
+end
+
+figure 
+class = classify(test_data,train_data,class_set);
+cf = confusionchart(class_set,class);
+
+
+
 %% OUR LDA: Mean and standardisation
 
 mean_centred = cell(1,8);
@@ -205,4 +322,37 @@ for i = 1:8
    mn = mean(mean_centred{1,i});
    class_means(i,:) = mn;
 end
+
+
+%% Functions
+function avg_fr = average_fr(spike_data)
+    %spike_data: any matrix of neurons x spikes(over time)
+    [neurons, len_data] = size(spike_data);
+    avg_fr = zeros(neurons,1);
+    avg_fr(:,1) = sum(spike_data,2);
+    avg_fr = avg_fr./len_data;
+    %avg_fr = transpose(avg_fr);
+end
+
+function design_mat = calculate_design_matrix(spike_data, training_size)
+    %spike_data: full set of unprocessed spike data
+    %training_size: rows out of 100 to use for training and design matrix
+    %window_sizes: 1x2 array indicating the size of the prep and after
+    %movement windows
+    
+    design_mat = cell(training_size, 8);
+    
+    for i = 1:training_size
+        for j = 1:8
+            feature_mat = zeros(98,4);
+            feature_mat(:,1) = average_fr(spike_data(i,j).spikes(:,:));
+            feature_mat(:,2) = average_fr(spike_data(i,j).spikes(:,1:300));
+            feature_mat(:,3) = average_fr(spike_data(i,j).spikes(:,301:end-100));
+            feature_mat(:,4) = average_fr(spike_data(i,j).spikes(:,end-99:end));
+            design_mat{i,j} = feature_mat;    
+        end
+    end  
+end
+
+
 
