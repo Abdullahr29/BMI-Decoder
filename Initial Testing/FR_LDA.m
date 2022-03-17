@@ -1,5 +1,5 @@
 %% Calculate Firing Rates
-
+tic
 design_mat = calculate_design_matrix(trial, 80);
 
 % standarise the design_matrix
@@ -12,6 +12,8 @@ design_mat_standarised(isnan(design_mat_standarised)) = 0;
 design_mat_standarised(isinf(design_mat_standarised)) = 0;
 
 [ eigenvalues, principal_components] = our_pca(design_mat_standarised, 1,100);
+% with pc's = 10, time = 0.353711 and there are two errors
+% with pc's = 100, time = 0.358883 and there are no errors
 design_mat_standarised = design_mat_standarised*principal_components;
 Y=repmat([1:1:8]',80,1);
 model = fitcdiscr(design_mat_standarised,Y);
@@ -31,6 +33,8 @@ Y2=repmat([1:1:8]',20,1);
 % figure
 % cf = confusionchart(Y2,class);
 class = predict(model,design2); 
+toc
+t = toc;
 figure
 cf = confusionchart(class,Y2);
 
