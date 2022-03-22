@@ -1,7 +1,7 @@
 % Basically, we have to create 2 functions
  
 ix = randperm(length(trial));
-%params = positionEstimatorTraining(trial(ix(1:75),:));
+params = positionEstimatorTraining(trial(ix(1:75),:));
 % zero padding the training data
 trainingData = cell(80,8);
 for i = 1:8
