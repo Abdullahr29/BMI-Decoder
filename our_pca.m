@@ -1,5 +1,4 @@
- 
-function [eigenvalues, principal_components] = our_pca(data, variance_explained, dims)
+ function [eigenvalues, principal_components] = our_pca(data, variance_explained, dims)
     % data: features/variables in columns, samples/timesteps in rows
     [~,S,V] = svd(data);
     eigenvalues = diag(S);
