@@ -1,9 +1,3 @@
-load('monkeydata_training.mat')
-ix = randperm(length(trial));
-params = positionEstimatorTraining(trial(ix(1:75),:));
-
-[x,y] = positionEstimator(trial(ix(78),1),params)
-
 % 1.
 % Use some data to create a model
 % We have to return the characteristic model parameters
