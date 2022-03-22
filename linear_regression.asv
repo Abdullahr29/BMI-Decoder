@@ -1,0 +1,205 @@
+%% Linear Regression
+training_data = trial(1:80,:);
+data_cell = struct2cell(training_data); % convert to cell matrix
+max_length = @(x) length(x); % function handle to get max length of all elements in cell
+a = cellfun(max_length,data_cell);
+a = squeeze(a(3,:,:)); % max length of each trial
+L = max(a,[],'all'); % longest trial
+
+
+
+% prep testting data
+design_mat_test = calculate_test_design_matrix(trial, 20); % matrix with FR instead of spikes
+
+% Fit data into regression model
+design_mat = calculate_design_matrix(trial, 80); % matrix with FR instead of spikes
+tic
+[fr_avg ,fr_total] = fr_features(training_data,20,560);
+[params] = get_lin_regression_params(training_data,L, fr_avg ,fr_total);
+toc
+t = toc;
+
+
+%% Functions
+function [R_param] = get_lin_regression_params(data,L,fr_total)
+% data: training data
+% L : length of longest trial
+    [T,A] = size(data); % get dimensions of data
+    x_avg = zeros(A,L); % initialise variables
+    y_avg = zeros(A,L);
+    x_pos = zeros(T,A,L);
+    y_pos = zeros(T,A,L);
+    x_vel = zeros(T,A,L);
+    y_vel = zeros(T,A,L);
+    x_acc = zeros(T,A,L);
+    y_acc = zeros(T,A,L);
+    x_detrend = zeros(T,A,L);
+    y_detrend = zeros(T,A,L);
+    R_param = struct(); % where parmeters are going to load
+    for a = 1:1:A
+        for t = 1:1:T
+            var_x = data(t,a).handPos(1,:);
+            var_y = data(t,a).handPos(2,:);
+            x_pos(t,a,:) = [var_x var_x(end)*ones(1,L-length(var_x))];
+            y_pos(t,a,:) = [var_y var_y(end)*ones(1,L-length(var_y))];
+            x_vel(t,a,:) = [0 diff(squeeze(x_pos(t,a,:))')/0.02]; %calculate immediate velocity
+            y_vel(t,a,:) = [0 diff(squeeze(y_pos(t,a,:))')/0.02];
+            x_acc(t,a,:) = [0 0 diff(diff(squeeze(x_pos(t,a,:))')/0.02)/0.02]; %calculate immediate acceleration
+            y_acc(t,a,:) = [0 0 diff(diff(squeeze(y_pos(t,a,:))')/0.02)/0.02];
+        end
+        x_avg(a,:) = squeeze(mean(x_pos(:,a,:),1))';
+        y_avg(a,:) = squeeze(mean(y_pos(:,a,:),1))';
+    end
+    
+
+    % detrend data to help the algorithm identify possible subtrends in it
+    
+    for i = 1:T
+        x_detrend(i,:,:) = squeeze(x_pos(i,:,:)) - x_avg;
+        y_detrend(i,:,:) = squeeze(y_pos(i,:,:)) - y_avg;
+    end
+    
+    %calculate std of hand position data
+    
+    x_s1 = std(x_pos,1);
+    x_std = squeeze(x_s1);
+    y_s1 = std(y_pos,1);
+    y_std = squeeze(y_s1);
+    
+    % sample data
+    %range_of_interest = 301:end-100 and we can choose a time step maybe of
+    %dt = 10 - try different ones to see result change
+    x_detrend_s = x_detrend(:,:,301:end-100); % region of movement (ma)
+    y_detrend_s = y_detrend(:,:,301:end-100);
+    dt = 20;
+    %range = size(x_detrend_s,3); % length of range of interest
+    range = 320:dt:560;
+    % load parameters
+    for a = 1:A
+        for bin = 1:length(range)
+            R_param(a,bin).x_avg_sampled = x_avg(a,range(bin)); % store mean positions at relevant locations
+            R_param(a,bin).y_avg_sampled = y_avg(a,range(bin));
+            R_param(a,bin).x_std_sampled = x_std(a,range(bin)); % store standard deviation of positions at relevant locations
+            R_param(a,bin).y_std_sampled = y_std(a,range(bin));
+            R_param(a,bin).x_vel_sampled = squeeze(mean(x_vel(:,a,range(bin)),1)); % store mean velocity at relevant locations
+            R_param(a,bin).y_vel_sampled = squeeze(mean(y_vel(:,a,range(bin)),1));
+            R_param(a,bin).x_acc_sampled = squeeze(mean(x_acc(:,a,range(bin)),1)); % store mean acceleration at relevant locations
+            R_param(a,bin).y_acc_sampled = squeeze(mean(y_acc(:,a,range(bin)),1));
+
+            idx_angle = (a-1)*T+1; % angle range index (for each a)
+            bin_idx = (range(bin)/dt); % bin range index (for each bin)
+            fr_bin = fr_total(idx_angle:idx_angle+T-1,1:98*bin_idx);
+            bin_x = squeeze(x_detrend_s(:,a,bin));
+            bin_y = squeeze(y_detrend_s(:,a,bin));
+            bin_x_vel = squeeze(x_vel(:,a,bin)-squeeze(mean(x_vel(:,a,range(bin)),1))); % add detrended velocity
+            bin_y_vel = squeeze(y_vel(:,a,bin)-squeeze(mean(y_vel(:,a,range(bin)),1)));
+            bin_x_acc = squeeze(x_acc(:,a,bin)-squeeze(mean(x_acc(:,a,range(bin)),1))); % add detrended acceleration
+            bin_y_acc = squeeze(y_acc(:,a,bin)-squeeze(mean(y_acc(:,a,range(bin)),1)));
+            kin = [bin_x bin_y bin_x_vel bin_y_vel bin_x_acc bin_y_acc];
+
+            fr_bin_avg = mean(fr_bin,1);
+            R_param(a,bin).fr_bin_avg=fr_bin_avg; % store trial average firing rate per bin
+
+            % Use PCA to extract principle components
+            p = T-1;
+            [eigenvalues, P] = our_pca(fr_bin,0,p);
+            W = P'*(fr_bin'-fr_bin_avg');
+            update=P*(W*W')^(-1)*W*kin; % calculate linear regression
+            R_param(a,bin).update = update;
+        end
+    end
+    
+end
+
+
+function avg_fr = average_fr(spike_data)
+    %spike_data: any matrix of neurons x spikes(over time)
+    [neurons, len_data] = size(spike_data);
+    avg_fr = zeros(neurons,1);
+    avg_fr(:,1) = sum(spike_data,2);
+    avg_fr = avg_fr./len_data;
+    %avg_fr = transpose(avg_fr);
+end
+
+function design_mat = calculate_design_matrix(spike_data, training_size)
+    %spike_data: full set of unprocessed spike data
+    %training_size: rows out of 100 to use for training and design matrix
+    %window_sizes: 1x2 array indicating the size of the prep and after
+    %movement windows
+    
+    
+    fr_avg = zeros(training_size*8,98);
+    fr_avg_pa = zeros(training_size*8,98);
+    fr_avg_ma = zeros(training_size*8,98);
+    fr_avg_c = zeros(training_size*8,98);
+    temp = 0;
+    for i = 1:training_size
+        for j = 1:8
+            temp = temp + 1;
+            fr_avg(temp,:) = average_fr(spike_data(i,j).spikes(:,:));
+            fr_avg_pa(temp,:) = average_fr(spike_data(i,j).spikes(:,1:300));
+            fr_avg_ma(temp,:) = average_fr(spike_data(i,j).spikes(:,301:end-100));
+            fr_avg_c(temp,:) = average_fr(spike_data(i,j).spikes(:,end-99:end));
+               
+        end
+    end
+    design_mat =[fr_avg,fr_avg_pa,fr_avg_ma,fr_avg_c];
+end
+
+
+function design_mat_test = calculate_test_design_matrix(spike_data, training_size)
+    %spike_data: full set of unprocessed spike data
+    %training_size: rows out of 100 to use for training and design matrix
+    %window_sizes: 1x2 array indicating the size of the prep and after
+    %movement windows
+    
+    
+    fr_avg = zeros(training_size*8,98);
+    fr_avg_pa = zeros(training_size*8,98);
+    fr_avg_ma = zeros(training_size*8,98);
+    fr_avg_c = zeros(training_size*8,98);
+    temp = 0;
+    for i = 81: 80+training_size
+        for j = 1:8
+            temp = temp + 1;
+            fr_avg(temp,:) = average_fr(spike_data(i,j).spikes(:,:));
+            fr_avg_pa(temp,:) = average_fr(spike_data(i,j).spikes(:,1:300));
+            fr_avg_ma(temp,:) = average_fr(spike_data(i,j).spikes(:,301:end-100));
+            fr_avg_c(temp,:) = average_fr(spike_data(i,j).spikes(:,end-99:end));
+               
+        end
+    end
+    design_mat_test =[fr_avg,fr_avg_pa,fr_avg_ma,fr_avg_c];
+end
+
+
+
+function [fr_avg ,fr_total] = fr_features(data,dt,N)
+    %FR_FEATURES Calculates the firing rate of the data in bins of size dt.
+    % data - given data struct
+    % dt - time bin size
+    % N - total number of samples length of
+    % fr_total - spiking rate divided in bins
+    % fr_avg - average spiking rate across bins
+
+    [T,A] = size(data); %get trial and angle length
+
+    acc = 1;
+    fr_avg = zeros(T*A,98); % initialise variables
+    fr_total = zeros(T*A,N/dt*98);
+    for t=1:1:T
+        for a=1:1:A
+            fr = zeros(98,length(0:dt:N)-1);
+            for u=1:1:98
+                var = data(t,a).spikes(u,1:N);
+                var(var==0) = NaN; % make zeros equal to NaN
+                count = histcounts([1:1:N].*var,0:dt:N); % count spikes in every dt bin until N
+                fr(u,:) = count/dt;
+            end
+            fr_avg(acc,:) = mean(fr,2); % get mean firing rate across bins
+            f = reshape(fr,size(fr,1)*size(fr,2),1);
+            fr_total(acc,:) = f; % get all firing rates ordered in 98 blocks of the same bin
+            acc = acc+1;
+        end
+    end
+end
