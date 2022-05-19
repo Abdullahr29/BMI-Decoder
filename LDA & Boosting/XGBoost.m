@@ -1,3 +1,5 @@
+%LSBoost
+
 close all; clear all;
 
 load monkeydata_training.mat
@@ -65,7 +67,7 @@ end
 tic
 
 
-mdl = fitrensemble(pca_rate_trials{1,1}.projection, concat_pos_trials{1,1}(:,2), 'LearnRate',0.15, 'NumLearningCycles',2000);
+mdl = fitrensemble(pca_rate_trials{1,1}.projection, concat_pos_trials{1,1}(:,2), 'LearnRate',0.15, 'NumLearningCycles',5000);
 toc
 t = toc;
 %% pred
